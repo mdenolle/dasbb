@@ -1,0 +1,43 @@
+[workspace]
+name = "dasbb"
+version = "0.1.0"
+description = "Joint DAS + Broadband Bayesian seismic inversion for earthquake location and tomography"
+channels = ["conda-forge"]
+platforms = ["osx-arm64", "osx-64", "linux-64", "win-64"]
+
+[dependencies]
+python = ">=3.9"
+numpy = ">=1.22"
+scipy = ">=1.9"
+matplotlib = ">=3.5"
+h5py = ">=3.7"
+pytest = ">=7.0"
+pytest-cov = ">=4.0"
+jupyter = "*"
+ipykernel = "*"
+pip = "*"
+
+[pypi-dependencies]
+scikit-fmm = ">=2022.3"
+dasbb = { path = ".", editable = true }
+
+[feature.mcmc.dependencies]
+pymc = ">=5.0"
+emcee = ">=3.1"
+
+[feature.io.dependencies]
+obspy = ">=1.4"
+
+[feature.dev.dependencies]
+pytest = ">=7.0"
+pytest-cov = ">=4.0"
+
+[environments]
+default = { features = ["dev"], solve-group = "default" }
+mcmc = { features = ["mcmc"], solve-group = "default" }
+io = { features = ["io"], solve-group = "default" }
+dev = { features = ["dev"], solve-group = "default" }
+all = { features = ["mcmc", "io", "dev"], solve-group = "default" }
+
+[tasks]
+test = "pytest"

@@ -1,0 +1,109 @@
+# dasbb — Joint DAS + Broadband Seismic Inversion
+
+Bayesian framework for fusing dense, low-aperture DAS fiber-optic arrays with sparse, wide-aperture broadband seismic networks. Solves the earthquake location and velocity tomography problems with proper heteroscedastic, correlated data covariance.
+
+## Why this exists
+
+DAS gives you ~5,000 picks at sub-millisecond precision along a fiber — but the geometry is quasi-linear, so you constrain one slowness component well and the others poorly. Broadband networks give you ~30 picks with wide azimuthal coverage — but far fewer observations and larger uncertainties.
+
+Naively stacking them lets DAS dominate by count. This framework solves the problem correctly: the DAS covariance matrix (exponential spatial correlation + shared clock jitter) reduces 5,000 channels to ~200 effective independent observations. The covariance-weighted objective function balances data types automatically — no ad hoc reweighting.
+
+## Capabilities
+
+| Module | What it does |
+|--------|-------------|
+| `dasbb.data` | Data structures for DAS picks, broadband picks, and velocity models with covariance builders |
+| `dasbb.forward` | Eikonal travel-time solver with sub-cell source positioning and Fréchet derivatives |
+| `dasbb.inversion` | Joint Gauss-Newton location and alternating hypocenter-velocity tomography |
+| `dasbb.design` | D/A/E-optimal sensor placement, geometry weight mapping, azimuthal gap analysis |
+| `dasbb.information` | KL-divergence information gain, per-station marginal value, resolution gain (location vs tomography) |
+| `dasbb.weighting` | Helmert VCE, IRLS robust estimation, task-adaptive weights, GCV regularization |
+| `dasbb.diagnostics` | Location ellipsoids, Fisher decomposition plots, resolution slices, sensor ranking maps |
+
+## Quick start
+
+```bash
+pip install numpy scipy scikit-fmm matplotlib h5py
+```
+
+```python
+from dasbb import JointInversion, InversionConfig, generate_synthetic_test
+
+# Generate a test scenario
+synth = generate_synthetic_test(n_das_channels=500, n_bb_stations=30)
+
+# Run joint inversion
+inv = JointInversion(synth['velocity_model'])
+result = inv.locate_event(
+    synth['das_picks'], synth['bb_picks'],
+    initial_source=synth['true_source'] + [1, -0.5, 1.5],
+)
+
+# Inspect results
+print(f"Location error: {np.linalg.norm(result['source_xyz'] - synth['true_source']):.3f} km")
+print(f"95% ellipsoid semi-axes: {result['location_ellipsoid']['semi_axes_km']} km")
+
+# Fisher information decomposition: which data type constrains what?
+decomp = inv.information_decomposition(result['F_das'], result['F_bb'])
+for direction, info in decomp.items():
+    print(f"  {direction}: DAS {info['das_fraction']:.0%}, BB {info['bb_fraction']:.0%}")
+```
+
+## Validated scenarios
+
+| Scenario | Grid | DAS channels | BB stations | Joint error | DAS-only | BB-only |
+|----------|------|-------------|-------------|-------------|----------|---------|
+| Alaska TAPS corridor | 60×60×20 @ 1 km | 500 (N_eff=73) | 20 | 1.87 km | 2.61 km | 0.61 km |
+| Ocean island volcano | 40×40×15 @ 0.5 km | 500 (N_eff=60) | 25 | 0.27 km | 2.04 km | 0.09 km |
+
+Joint inversion always reduces the uncertainty ellipsoid volume compared to either data type alone — 8.5× for Alaska, 2.7× for the volcanic scenario.
+
+## Repository structure
+
+```
+dasbb/
+├── dasbb/
+│   ├── __init__.py          # Public API
+│   ├── data.py              # DASPicks, BroadbandPicks, VelocityModel
+│   ├── forward.py           # EikonalSolver, travel times, Fréchet derivatives
+│   ├── inversion.py         # JointInversion, InversionConfig
+│   ├── design.py            # OptimalDesign, sensor placement
+│   ├── information.py       # InformationGain, KL divergence, resolution
+│   ├── weighting.py         # AdaptiveWeighting, VCE, IRLS, GCV
+│   ├── diagnostics.py       # Plotting and analysis tools
+│   └── synthetic.py         # Test scenario generators
+├── tests/
+│   ├── test_forward.py      # Forward engine validation
+│   ├── test_inversion.py    # Location and tomography tests
+│   ├── test_design.py       # Optimal placement tests
+│   └── test_weighting.py    # VCE, IRLS, GCV tests
+├── examples/
+│   ├── alaska_das.py        # Full Alaska DAS + AK network example
+│   ├── ocean_island.py      # Volcanic DAS + HVO network example
+│   └── sensor_placement.py  # Optimal design workflow
+├── pyproject.toml
+└── README.md
+```
+
+## Theory
+
+See `docs/theory.md` for the full mathematical framework, including:
+- Data covariance architecture (why DAS picks are correlated)
+- Effective number of independent observations
+- Joint objective function and natural data balancing
+- Fisher information decomposition
+- Resolution matrix and checkerboard analysis
+
+## License
+
+MIT
+
+## Citation
+
+If you use this framework in published research, please cite:
+```
+@software{dasbb,
+  title={dasbb: Joint DAS + Broadband Bayesian Seismic Inversion},
+  url={https://github.com/your-org/dasbb},
+}
+```
